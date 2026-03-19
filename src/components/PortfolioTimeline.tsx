@@ -455,7 +455,7 @@ function MonthsGrid({
 							{year}
 						</h2>
 						<div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-[rgba(201,168,124,0.15)]" />
-						<span className="text-xs text-[#6b6560] whitespace-nowrap">
+						<span className="text-xs text-[#6b6560] whitespace-nowrap absolute right-0">
 							{months.reduce((sum, m) => sum + m.count, 0)} bookings
 						</span>
 					</div>
@@ -534,11 +534,11 @@ function MonthsGrid({
 													<h3 className="text-xl font-[family-name:var(--font-playfair)] font-semibold text-[#f5f0eb] group-hover:text-[#c9a87c] transition-colors duration-300">
 														{monthData.monthName}
 													</h3>
-													{!showYearHeaders && (
-														<span className="text-xs text-[#6b6560] tracking-wider">
-															{monthData.year}
-														</span>
-													)}
+													{/* {!showYearHeaders && ( */}
+													<span className="text-xs text-[#6b6560] tracking-wider">
+														{monthData.year}
+													</span>
+													{/* )} */}
 												</div>
 												<div className="w-8 h-8 rounded-full border border-[#c9a87c]/20 flex items-center justify-center group-hover:border-[#c9a87c]/60 group-hover:bg-[#c9a87c]/10 transition-all duration-300">
 													<svg
