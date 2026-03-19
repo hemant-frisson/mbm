@@ -1,87 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { heroContentTable } from "@/db/schema";
+import { HeroContent } from "@/db/models";
 import { requireAdmin } from "@/lib/auth";
-import { eq } from "drizzle-orm";
 
 // GET — fetch hero content
 export async function GET() {
-	try {
-		const [hero] = await db.select().from(heroContentTable).limit(1);
-		return NextResponse.json(hero || {});
-	} catch (err) {
-		console.error("Error fetching hero:", err);
-		return NextResponse.json(
-			{ error: "Failed to fetch hero content" },
-			{ status: 500 },
-		);
-	}
+  try {
+    const hero = await HeroContent.findOne();
+    return NextResponse.json(hero || {});
+  } catch (err) {
+    console.error("Error fetching hero:", err);
+    return NextResponse.json({ error: "Failed to fetch hero content" }, { status: 500 });
+  }
 }
 
 // PUT — update hero content (admin only)
 export async function PUT(req: NextRequest) {
-	try {
-		await requireAdmin();
-		const body = await req.json();
+  try {
+    await requireAdmin();
+    const body = await req.json();
 
-		const {
-			badgeText,
-			titlePart1,
-			titlePart2,
-			subtitle,
-			primaryCtaText,
-			primaryCtaLink,
-			secondaryCtaText,
-			secondaryCtaLink,
-			backgroundImage,
-		} = body;
+    const {
+      badgeText,
+      titlePart1,
+      titlePart2,
+      subtitle,
+      primaryCtaText,
+      primaryCtaLink,
+      secondaryCtaText,
+      secondaryCtaLink,
+      backgroundImage,
+      stat1Number,
+      stat1Label,
+      stat2Number,
+      stat2Label,
+      stat3Number,
+      stat3Label,
+    } = body;
 
-		// Check if hero exists
-		const [existing] = await db.select().from(heroContentTable).limit(1);
+    const hero = await HeroContent.findOne();
 
-		if (existing) {
-			const [updated] = await db
-				.update(heroContentTable)
-				.set({
-					badgeText,
-					titlePart1,
-					titlePart2,
-					subtitle,
-					primaryCtaText,
-					primaryCtaLink,
-					secondaryCtaText,
-					secondaryCtaLink,
-					backgroundImage,
-					updatedAt: new Date(),
-				})
-				.where(eq(heroContentTable.id, existing.id))
-				.returning();
-			return NextResponse.json(updated);
-		} else {
-			const [inserted] = await db
-				.insert(heroContentTable)
-				.values({
-					badgeText,
-					titlePart1,
-					titlePart2,
-					subtitle,
-					primaryCtaText,
-					primaryCtaLink,
-					secondaryCtaText,
-					secondaryCtaLink,
-					backgroundImage,
-				})
-				.returning();
-			return NextResponse.json(inserted);
-		}
-	} catch (err: any) {
-		if (err.message === "Unauthorized") {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-		console.error("Error updating hero:", err);
-		return NextResponse.json(
-			{ error: "Failed to update hero content" },
-			{ status: 500 },
-		);
-	}
+    const data = {
+      badgeText,
+      titlePart1,
+      titlePart2,
+      subtitle,
+      primaryCtaText,
+      primaryCtaLink,
+      secondaryCtaText,
+      secondaryCtaLink,
+      backgroundImage,
+      stat1Number,
+      stat1Label,
+      stat2Number,
+      stat2Label,
+      stat3Number,
+      stat3Label,
+    };
+
+    if (hero) {
+      await hero.update(data);
+      return NextResponse.json(hero);
+    } else {
+      const inserted = await HeroContent.create(data);
+      return NextResponse.json(inserted);
+    }
+  } catch (err: any) {
+    if (err.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    console.error("Error updating hero:", err);
+    return NextResponse.json({ error: "Failed to update hero content" }, { status: 500 });
+  }
 }
