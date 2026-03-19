@@ -1,26 +1,193 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-card: #161616;
+  --bg-elevated: #1a1a1a;
+  --text-primary: #f5f0eb;
+  --text-secondary: #a8a29e;
+  --text-muted: #6b6560;
+  --accent: #c9a87c;
+  --accent-light: #e8d5b7;
+  --accent-rose: #d4a0a0;
+  --accent-glow: rgba(201, 168, 124, 0.15);
+  --border: rgba(201, 168, 124, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-outfit), sans-serif;
+  --font-display: var(--font-playfair), serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Glass morphism card */
+.glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(22, 22, 22, 0.9) 0%,
+    rgba(26, 26, 26, 0.7) 100%
+  );
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+/* Rose gold gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #c9a87c 0%, #d4a0a0 50%, #e8d5b7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effect */
+.glow {
+  box-shadow: 0 0 40px rgba(201, 168, 124, 0.08),
+    0 0 80px rgba(201, 168, 124, 0.04);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 40px rgba(201, 168, 124, 0.15),
+    0 0 80px rgba(201, 168, 124, 0.08);
+}
+
+/* Subtle shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 168, 124, 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 8s ease-in-out infinite;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Timeline specific */
+.timeline-container {
+  perspective: 1200px;
+}
+
+.timeline-card {
+  transform-style: preserve-3d;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.timeline-card:hover {
+  transform: translateZ(30px) rotateY(-2deg) scale(1.02);
+}
+
+/* Smooth section transitions */
+section {
+  position: relative;
+}
+
+/* Decorative gradient orbs */
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Particle shine for timeline nodes */
+@keyframes node-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(201, 168, 124, 0.3), 0 0 10px rgba(201, 168, 124, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(201, 168, 124, 0.6), 0 0 30px rgba(201, 168, 124, 0.2);
+  }
+}
+
+.timeline-node {
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+/* Stagger animation for children */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s ease-out forwards;
+  opacity: 0;
+}
+
+/* 3D perspective for timeline track */
+.timeline-track {
+  transform-style: preserve-3d;
+  perspective: 2000px;
+}
+
+/* Reveal animation on scroll */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(40px) rotateX(10deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+.reveal-on-scroll {
+  animation: reveal 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
