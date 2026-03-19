@@ -6,7 +6,7 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL_UNPOOLED!);
 const db = drizzle(sql, { schema });
 
 async function seed() {
