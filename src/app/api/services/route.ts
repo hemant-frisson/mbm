@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Service } from "@/db/models";
+import { db } from "@/db";
+import { servicesTable } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { eq } from "drizzle-orm";
 
 // GET — list all services (public)
 export async function GET() {
   try {
-    const allServices = await Service.findAll({
-      order: [["sort_order", "ASC"]],
-    });
+    const allServices = await db
+      .select()
+      .from(servicesTable)
+      .orderBy(servicesTable.sortOrder);
     return NextResponse.json(allServices);
   } catch (err) {
     console.error("Error fetching services:", err);
     return NextResponse.json(
       { error: "Failed to fetch services" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -28,17 +31,20 @@ export async function POST(req: NextRequest) {
     if (!title || !description || !imageUrl) {
       return NextResponse.json(
         { error: "Title, description, and imageUrl are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const service = await Service.create({
-      title,
-      description,
-      imageUrl,
-      icon: icon || "✨",
-      sortOrder: sortOrder ?? 0,
-    });
+    const [service] = await db
+      .insert(servicesTable)
+      .values({
+        title,
+        description,
+        imageUrl,
+        icon: icon || "✨",
+        sortOrder: sortOrder ?? 0,
+      })
+      .returning();
 
     return NextResponse.json(service, { status: 201 });
   } catch (err: unknown) {
@@ -48,12 +54,12 @@ export async function POST(req: NextRequest) {
     console.error("Error creating service:", err);
     return NextResponse.json(
       { error: "Failed to create service" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-// PUT — update service (admin only)
+// PUT — update service (admin only, uses query param ?id=)
 export async function PUT(req: NextRequest) {
   try {
     await requireAdmin();
@@ -64,13 +70,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const service = await Service.findByPk(id);
+    const [updated] = await db
+      .update(servicesTable)
+      .set(updates)
+      .where(eq(servicesTable.id, id))
+      .returning();
 
-    if (!service) {
+    if (!updated) {
       return NextResponse.json({ error: "Service not found" }, { status: 404 });
     }
-
-    const updated = await service.update(updates);
 
     return NextResponse.json(updated);
   } catch (err: unknown) {
@@ -80,7 +88,7 @@ export async function PUT(req: NextRequest) {
     console.error("Error updating service:", err);
     return NextResponse.json(
       { error: "Failed to update service" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -95,13 +103,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const service = await Service.findByPk(id);
+    const [deleted] = await db
+      .delete(servicesTable)
+      .where(eq(servicesTable.id, id))
+      .returning();
 
-    if (!service) {
+    if (!deleted) {
       return NextResponse.json({ error: "Service not found" }, { status: 404 });
     }
-
-    await service.destroy();
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -111,7 +120,7 @@ export async function DELETE(req: NextRequest) {
     console.error("Error deleting service:", err);
     return NextResponse.json(
       { error: "Failed to delete service" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

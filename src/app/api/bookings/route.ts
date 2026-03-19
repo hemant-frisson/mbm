@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Booking, BookingImage, sequelize } from "@/db/models";
+import { db } from "@/db";
+import { bookingsTable, bookingImages } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { desc, eq } from "drizzle-orm";
 
 // GET — list all bookings with images
 export async function GET() {
   try {
-    const allBookings = await Booking.findAll({
-      include: [{ model: BookingImage, as: "images" }],
-      order: [
-        ["date", "DESC"],
-        [{ model: BookingImage, as: "images" }, "sort_order", "ASC"],
-      ],
-    });
+    const allBookings = await db
+      .select()
+      .from(bookingsTable)
+      .orderBy(desc(bookingsTable.date));
 
-    return NextResponse.json(allBookings);
+    const allImages = await db
+      .select()
+      .from(bookingImages)
+      .orderBy(bookingImages.sortOrder);
+
+    const result = allBookings.map((b) => ({
+      ...b,
+      images: allImages.filter((img) => img.bookingId === b.id),
+    }));
+
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Error fetching bookings:", err);
     return NextResponse.json(
@@ -25,57 +34,58 @@ export async function GET() {
 
 // POST — create a new booking (admin only)
 export async function POST(req: NextRequest) {
-  const transaction = await sequelize.transaction();
   try {
     await requireAdmin();
     const body = await req.json();
 
-    const { title, location, category, description, date, clientName, images } = body;
+    const { title, location, category, description, date, clientName, images } =
+      body;
 
     if (!title || !location || !category || !date) {
-      await transaction.rollback();
       return NextResponse.json(
         { error: "Title, location, category, and date are required" },
         { status: 400 },
       );
     }
 
-    const booking = await Booking.create(
-      {
+    const [booking] = await db
+      .insert(bookingsTable)
+      .values({
         title,
         location,
         category,
         description: description || null,
         date,
         clientName: clientName || null,
-      },
-      { transaction }
-    );
+      })
+      .returning();
 
     // Insert images if provided
     if (images && Array.isArray(images) && images.length > 0) {
-      await BookingImage.bulkCreate(
-        images.map((img: { imageUrl: string; caption?: string }, i: number) => ({
-          bookingId: booking.id,
-          imageUrl: img.imageUrl,
-          caption: img.caption || null,
-          sortOrder: i,
-        })),
-        { transaction }
+      await db.insert(bookingImages).values(
+        images.map(
+          (img: { imageUrl: string; caption?: string }, i: number) => ({
+            bookingId: booking.id,
+            imageUrl: img.imageUrl,
+            caption: img.caption || null,
+            sortOrder: i,
+          }),
+        ),
       );
     }
 
-    await transaction.commit();
+    // Return the full booking with images
+    const insertedImages = await db
+      .select()
+      .from(bookingImages)
+      .where(eq(bookingImages.bookingId, booking.id))
+      .orderBy(bookingImages.sortOrder);
 
-    // Fetch the newly created booking with its images
-    const createdBooking = await Booking.findByPk(booking.id, {
-      include: [{ model: BookingImage, as: "images" }],
-      order: [[{ model: BookingImage, as: "images" }, "sort_order", "ASC"]],
-    });
-
-    return NextResponse.json(createdBooking, { status: 201 });
+    return NextResponse.json(
+      { ...booking, images: insertedImages },
+      { status: 201 },
+    );
   } catch (err: unknown) {
-    if (transaction) await transaction.rollback();
     if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -64,5 +64,11 @@ export const heroContentTable = pgTable("hero_content", {
   secondaryCtaText: varchar("secondary_cta_text", { length: 255 }).notNull().default("Book a Session"),
   secondaryCtaLink: varchar("secondary_cta_link", { length: 255 }).notNull().default("#contact"),
   backgroundImage: text("background_image").notNull().default("https://images.unsplash.com/photo-1742891602044-7fdc0a9839ad?w=1920&q=80"),
+  stat1Number: varchar("stat1_number", { length: 50 }).notNull().default("500+"),
+  stat1Label: varchar("stat1_label", { length: 100 }).notNull().default("Happy Brides"),
+  stat2Number: varchar("stat2_number", { length: 50 }).notNull().default("8+"),
+  stat2Label: varchar("stat2_label", { length: 100 }).notNull().default("Years Experience"),
+  stat3Number: varchar("stat3_number", { length: 50 }).notNull().default("50+"),
+  stat3Label: varchar("stat3_label", { length: 100 }).notNull().default("Cities Covered"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

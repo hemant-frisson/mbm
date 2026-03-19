@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AdminUser } from "@/db/models";
+import { db } from "@/db";
+import { adminUsers } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { signToken } from "@/lib/auth";
 
@@ -14,7 +16,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await AdminUser.findOne({ where: { email } });
+    const [user] = await db
+      .select()
+      .from(adminUsers)
+      .where(eq(adminUsers.email, email))
+      .limit(1);
 
     if (!user) {
       return NextResponse.json(

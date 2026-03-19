@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Booking, BookingImage, sequelize } from "@/db/models";
+import { db } from "@/db";
+import { bookingsTable, bookingImages } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { eq } from "drizzle-orm";
 
 // GET — single booking with images
 export async function GET(
@@ -9,17 +11,23 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
-    const booking = await Booking.findByPk(id, {
-      include: [{ model: BookingImage, as: "images" }],
-      order: [[{ model: BookingImage, as: "images" }, "sort_order", "ASC"]],
-    });
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, id))
+      .limit(1);
 
     if (!booking) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    return NextResponse.json(booking);
+    const images = await db
+      .select()
+      .from(bookingImages)
+      .where(eq(bookingImages.bookingId, id))
+      .orderBy(bookingImages.sortOrder);
+
+    return NextResponse.json({ ...booking, images });
   } catch (err) {
     console.error("Error fetching booking:", err);
     return NextResponse.json(
@@ -34,63 +42,58 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const transaction = await sequelize.transaction();
   try {
     await requireAdmin();
     const { id } = await params;
     const body = await req.json();
 
-    const { title, location, category, description, date, clientName, images } = body;
+    const { title, location, category, description, date, clientName, images } =
+      body;
 
-    const booking = await Booking.findByPk(id);
-
-    if (!booking) {
-      await transaction.rollback();
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-    }
-
-    await booking.update(
-      {
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({
         ...(title && { title }),
         ...(location && { location }),
         ...(category && { category }),
-        description: description ?? null,
+        description: description ?? undefined,
         ...(date && { date }),
-        clientName: clientName ?? null,
-      },
-      { transaction }
-    );
+        clientName: clientName ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(bookingsTable.id, id))
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
 
     // If images provided, replace all images
     if (images && Array.isArray(images)) {
-      await BookingImage.destroy({
-        where: { bookingId: id },
-        transaction,
-      });
+      await db.delete(bookingImages).where(eq(bookingImages.bookingId, id));
 
       if (images.length > 0) {
-        await BookingImage.bulkCreate(
-          images.map((img: { imageUrl: string; caption?: string }, i: number) => ({
-            bookingId: id,
-            imageUrl: img.imageUrl,
-            caption: img.caption || null,
-            sortOrder: i,
-          })),
-          { transaction }
+        await db.insert(bookingImages).values(
+          images.map(
+            (img: { imageUrl: string; caption?: string }, i: number) => ({
+              bookingId: id,
+              imageUrl: img.imageUrl,
+              caption: img.caption || null,
+              sortOrder: i,
+            }),
+          ),
         );
       }
     }
 
-    await transaction.commit();
+    const updatedImages = await db
+      .select()
+      .from(bookingImages)
+      .where(eq(bookingImages.bookingId, id))
+      .orderBy(bookingImages.sortOrder);
 
-    const updatedBooking = await Booking.findByPk(id, {
-      include: [{ model: BookingImage, as: "images" }],
-      order: [[{ model: BookingImage, as: "images" }, "sort_order", "ASC"]],
-    });
-
-    return NextResponse.json(updatedBooking);
+    return NextResponse.json({ ...updated, images: updatedImages });
   } catch (err: unknown) {
-    if (transaction) await transaction.rollback();
     if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -102,7 +105,7 @@ export async function PUT(
   }
 }
 
-// DELETE — delete a booking (admin only)
+// DELETE — delete a booking (admin only) — cascades to images
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -111,15 +114,14 @@ export async function DELETE(
     await requireAdmin();
     const { id } = await params;
 
-    const booking = await Booking.findByPk(id);
+    const [deleted] = await db
+      .delete(bookingsTable)
+      .where(eq(bookingsTable.id, id))
+      .returning();
 
-    if (!booking) {
+    if (!deleted) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
-
-    // This will cascade delete images if the DB constraint is ON DELETE CASCADE
-    // Alternatively Sequelize destroys all related if configured, or we can just destroy booking.
-    await booking.destroy();
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

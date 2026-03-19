@@ -1,31 +1,101 @@
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import bcrypt from "bcryptjs";
+import * as schema from "../src/db/schema";
 import { config } from "dotenv";
+
 config({ path: ".env.local" });
 
-// Import models AFTER config
-import { AdminUser, Booking, BookingImage, Service, HeroContent, sequelize } from "../src/db/models";
-import bcrypt from "bcryptjs";
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql, { schema });
 
 async function seed() {
-  console.log("🌱 Seeding database with Sequelize...\n");
+  console.log("🌱 Seeding database using Drizzle...\n");
 
   try {
-    console.log("Connecting to database and syncing tables...");
-    await sequelize.authenticate();
-    console.log("✅ Authenticated");
-
-    // Sync all models (create tables if they don't exist)
-    await sequelize.sync({ force: false });
-    console.log("✅ Tables synchronized\n");
+    // ── Create tables (raw SQL) ────────────────────────────────────────────
+    console.log("Creating tables...");
+    await sql`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        description TEXT,
+        date DATE NOT NULL,
+        client_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS booking_images (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        image_url TEXT NOT NULL,
+        caption VARCHAR(500),
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS services (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        image_url TEXT NOT NULL,
+        icon VARCHAR(10) NOT NULL DEFAULT '✨',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS hero_content (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        badge_text VARCHAR(255) NOT NULL DEFAULT 'Professional Makeup Artist',
+        title_part1 VARCHAR(255) NOT NULL DEFAULT 'Meena',
+        title_part2 VARCHAR(255) NOT NULL DEFAULT 'Bisht',
+        subtitle TEXT NOT NULL DEFAULT 'Crafting timeless beauty for brides, celebrations, and every moment that matters. Where artistry meets elegance.',
+        primary_cta_text VARCHAR(255) NOT NULL DEFAULT 'Explore Portfolio',
+        primary_cta_link VARCHAR(255) NOT NULL DEFAULT '/portfolio',
+        secondary_cta_text VARCHAR(255) NOT NULL DEFAULT 'Book a Session',
+        secondary_cta_link VARCHAR(255) NOT NULL DEFAULT '#contact',
+        background_image TEXT NOT NULL DEFAULT 'https://images.unsplash.com/photo-1742891602044-7fdc0a9839ad?w=1920&q=80',
+        stat1_number VARCHAR(50) NOT NULL DEFAULT '500+',
+        stat1_label VARCHAR(100) NOT NULL DEFAULT 'Happy Brides',
+        stat2_number VARCHAR(50) NOT NULL DEFAULT '8+',
+        stat2_label VARCHAR(100) NOT NULL DEFAULT 'Years Experience',
+        stat3_number VARCHAR(50) NOT NULL DEFAULT '50+',
+        stat3_label VARCHAR(100) NOT NULL DEFAULT 'Cities Covered',
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+    // We add explicitly missing columns if they didn't exist before, using safe add
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat1_number VARCHAR(50) NOT NULL DEFAULT '500+'`; } catch (e) {}
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat1_label VARCHAR(100) NOT NULL DEFAULT 'Happy Brides'`; } catch (e) {}
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat2_number VARCHAR(50) NOT NULL DEFAULT '8+'`; } catch (e) {}
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat2_label VARCHAR(100) NOT NULL DEFAULT 'Years Experience'`; } catch (e) {}
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat3_number VARCHAR(50) NOT NULL DEFAULT '50+'`; } catch (e) {}
+    try { await sql`ALTER TABLE hero_content ADD COLUMN stat3_label VARCHAR(100) NOT NULL DEFAULT 'Cities Covered'`; } catch (e) {}
+    
+    console.log("✅ Tables created or verified\n");
 
     // ── Seed admin user ────────────────────────────────────────────────────
     console.log("Checking admin user...");
-    const adminEmail = "admin@mbm.com";
-    const existingAdmin = await AdminUser.findOne({ where: { email: adminEmail } });
+    const existingAdmin = await db.select().from(schema.adminUsers).limit(1);
 
-    if (!existingAdmin) {
+    if (existingAdmin.length === 0) {
       const passwordHash = await bcrypt.hash("admin123", 12);
-      await AdminUser.create({
-        email: adminEmail,
+      await db.insert(schema.adminUsers).values({
+        email: "admin@mbm.com",
         passwordHash,
         name: "Meena Bisht",
       });
@@ -36,9 +106,9 @@ async function seed() {
 
     // ── Seed hero content ──────────────────────────────────────────────────
     console.log("\nChecking hero content...");
-    const hero = await HeroContent.findOne();
-    if (!hero) {
-      await HeroContent.create({
+    const existingHero = await db.select().from(schema.heroContentTable).limit(1);
+    if (existingHero.length === 0) {
+      await db.insert(schema.heroContentTable).values({
         badgeText: "Professional Makeup Artist",
         titlePart1: "Meena",
         titlePart2: "Bisht",
@@ -62,8 +132,8 @@ async function seed() {
 
     // ── Seed services ──────────────────────────────────────────────────────
     console.log("\nChecking services...");
-    const existingServicesCount = await Service.count();
-    if (existingServicesCount === 0) {
+    const existingServicesCount = await db.select().from(schema.servicesTable).limit(1);
+    if (existingServicesCount.length === 0) {
       const serviceData = [
         {
           title: "Bridal Makeup",
@@ -87,7 +157,7 @@ async function seed() {
           sortOrder: 2,
         },
       ];
-      await Service.bulkCreate(serviceData);
+      await db.insert(schema.servicesTable).values(serviceData);
       console.log("✅ Services seeded");
     } else {
       console.log("✅ Services already exist");
@@ -95,8 +165,8 @@ async function seed() {
 
     // ── Seed bookings ──────────────────────────────────────────────────────
     console.log("\nChecking bookings...");
-    const existingBookingsCount = await Booking.count();
-    if (existingBookingsCount === 0) {
+    const existingBookingsCount = await db.select().from(schema.bookingsTable).limit(1);
+    if (existingBookingsCount.length === 0) {
       const bookingsData = [
         {
           title: "Traditional Bridal Look",
@@ -127,9 +197,10 @@ async function seed() {
 
       for (const b of bookingsData) {
         const { images, ...bookingFields } = b;
-        const booking = await Booking.create(bookingFields);
+        const [booking] = await db.insert(schema.bookingsTable).values(bookingFields).returning();
+        
         if (images && images.length > 0) {
-          await BookingImage.bulkCreate(
+          await db.insert(schema.bookingImages).values(
             images.map(img => ({ ...img, bookingId: booking.id }))
           );
         }
@@ -139,7 +210,7 @@ async function seed() {
       console.log("✅ Bookings already exist");
     }
 
-    console.log("\n🎉 Seeding complete via Sequelize!");
+    console.log("\n🎉 Seeding complete via Drizzle!");
     console.log("Admin credentials: admin@mbm.com / admin123");
     process.exit(0);
   } catch (err) {
