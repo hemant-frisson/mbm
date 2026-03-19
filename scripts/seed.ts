@@ -1,8 +1,9 @@
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
+// Import models AFTER config
 import { AdminUser, Booking, BookingImage, Service, HeroContent, sequelize } from "../src/db/models";
 import bcrypt from "bcryptjs";
-import { config } from "dotenv";
-
-config({ path: ".env.local" });
 
 async function seed() {
   console.log("🌱 Seeding database with Sequelize...\n");
@@ -13,7 +14,6 @@ async function seed() {
     console.log("✅ Authenticated");
 
     // Sync all models (create tables if they don't exist)
-    // force: false ensures we don't drop tables if they exist
     await sequelize.sync({ force: false });
     console.log("✅ Tables synchronized\n");
 
